@@ -1,7 +1,6 @@
-/*
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
-import 'teacher_timetable_screen.dart'; // ✅ Step 2: Import timetable screen
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_database/firebase_database.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -12,136 +11,183 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final List<String> days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
-  final List<String> teacherNames = [
-    'Dr. Sharma',
-    'Ms. Gupta',
-    'Mr. Khan',
-    'Prof. Verma',
-    'Mrs. Singh',
-    'Dr. Patel',
-    'Ms. Roy',
-    'Mr. Das',
-    'Prof. Mehta',
-    'Mrs. Joshi',
-  ];
-
-  String? selectedDay;
-  TimeOfDay? startTime;
-  TimeOfDay? endTime;
+  
+  // Firebase Database Reference
+  final DatabaseReference _databaseRef = FirebaseDatabase.instance.ref();
+  
+  // Timetable Variables
+  String? selectedTeacher;
+  String? selectedTimetableDay;
+  String? selectedTime;
+  List<Map<String, String>> timetableResult = [];
   bool isDarkMode = false;
-  String searchQuery = '';
+  bool isLoading = false;
+  
+  // Lists to be populated from Firebase
+  List<String> teachers = [];
+  List<String> times = ['9:00 - 10:00', '10:00 - 11:00', '11:00 - 12:00', '12:00 - 1:00', '2:00 - 3:00', '3:00 - 4:00'];
 
-  // ✅ Added TextEditingController
-  final TextEditingController searchController = TextEditingController();
+  // Mapping between display names and Firebase keys
+  final Map<String, String> _teacherKeyMap = {};
+  final Map<String, String> _dayKeyMap = {
+    'Monday': 'monday',
+    'Tuesday': 'tuesday',
+    'Wednesday': 'wednesday', 
+    'Thursday': 'thursday',
+    'Friday': 'friday'
+  };
 
-  String formatTime(TimeOfDay time) {
-    final now = DateTime.now();
-    final dt = DateTime(now.year, now.month, now.day, time.hour, time.minute);
-    return DateFormat.jm().format(dt);
+  @override
+  void initState() {
+    super.initState();
+    _initializeFirebase();
   }
 
-  Future<void> pickTime(bool isStart) async {
-    final TimeOfDay? picked = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.now(),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.light(
-              primary: Colors.indigo,
-              onPrimary: Colors.white,
-              surface: Colors.white,
-              onSurface: Colors.indigo[900]!,
-            ),
-            dialogBackgroundColor: Colors.white,
-          ),
-          child: child!,
-        );
-      },
-    );
+  // Initialize Firebase
+  Future<void> _initializeFirebase() async {
+    try {
+      await Firebase.initializeApp();
+      _loadTeachersFromFirebase();
+    } catch (e) {
+      print("Firebase initialization error: $e");
+    }
+  }
 
-    if (picked != null) {
-      final int selectedMinutes = picked.hour * 60 + picked.minute;
-      const int minMinutes = 8 * 60;
-      const int maxMinutes = 15 * 60;
+  // Load teachers list from Firebase
+  Future<void> _loadTeachersFromFirebase() async {
+    setState(() {
+      isLoading = true;
+    });
 
-      if (selectedMinutes < minMinutes || selectedMinutes > maxMinutes) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Please select time between 8:00 AM and 3:00 PM'),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
-        return;
+    try {
+      final snapshot = await _databaseRef.child('teachers').get();
+      
+      if (snapshot.exists) {
+        final data = snapshot.value as Map<dynamic, dynamic>;
+        final teacherList = <String>[];
+        _teacherKeyMap.clear();
+        
+        data.forEach((key, value) {
+          final teacherKey = key.toString();
+          final teacherName = value.toString();
+          teacherList.add(teacherName);
+          _teacherKeyMap[teacherName] = teacherKey;
+        });
+        
+        setState(() {
+          teachers = teacherList;
+        });
+      } else {
+        // If no teachers found, use default list
+        setState(() {
+          teachers = ['Mr. Sharma', 'Ms. Gupta', 'Mr. Khan', 'Prof. Verma', 'Mrs. Singh'];
+        });
+      }
+    } catch (e) {
+      print("Error loading teachers: $e");
+      setState(() {
+        teachers = ['Mr. Sharma', 'Ms. Gupta', 'Mr. Khan', 'Prof. Verma', 'Mrs. Singh'];
+      });
+    } finally {
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
+
+  // Load timetable data from Firebase
+  Future<void> showTimetable() async {
+    if (selectedTeacher == null || selectedTimetableDay == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select both Teacher and Day'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      isLoading = true;
+      timetableResult.clear();
+    });
+
+    try {
+      // Convert display names to Firebase keys
+      final teacherKey = _teacherKeyMap[selectedTeacher!];
+      final dayKey = _dayKeyMap[selectedTimetableDay!];
+      
+      if (teacherKey == null || dayKey == null) {
+        throw Exception('Could not find Firebase keys for selection');
       }
 
-      setState(() {
-        if (isStart) {
-          startTime = picked;
-          endTime ??= TimeOfDay(
-            hour: (picked.hour + 1).clamp(8, 15),
-            minute: picked.minute,
-          );
+      final snapshot = await _databaseRef
+          .child('timetable')
+          .child(teacherKey)
+          .child(dayKey)
+          .get();
+
+      if (snapshot.exists) {
+        final data = snapshot.value as Map<dynamic, dynamic>;
+        final List<Map<String, String>> classes = [];
+
+        data.forEach((key, value) {
+          if (value is Map<dynamic, dynamic>) {
+            classes.add({
+              'time': value['time']?.toString() ?? '',
+              'room': value['room']?.toString() ?? '',
+              'subject': value['subject']?.toString() ?? 'General Class',
+            });
+          }
+        });
+
+        // Filter by selected time if specified
+        if (selectedTime != null) {
+          final filteredClasses = classes.where((lec) => lec['time'] == selectedTime).toList();
+          setState(() {
+            timetableResult = filteredClasses;
+          });
+          
+          if (filteredClasses.isEmpty) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('No lecture found for that time')),
+            );
+          }
         } else {
-          endTime = picked;
+          setState(() {
+            timetableResult = classes;
+          });
         }
-      });
-    }
-  }
-
-  void resetFields() {
-    setState(() {
-      selectedDay = null;
-      startTime = null;
-      endTime = null;
-      searchQuery = '';
-      searchController.clear(); // ✅ Clear controller as well
-    });
-  }
-
-  void swapTimes() {
-    if (startTime != null && endTime != null) {
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No classes found for this day')),
+        );
+        setState(() {
+          timetableResult = [];
+        });
+      }
+    } catch (e) {
+      print("Error loading timetable: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error loading data: $e'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    } finally {
       setState(() {
-        final temp = startTime;
-        startTime = endTime;
-        endTime = temp;
+        isLoading = false;
       });
     }
   }
 
-  bool validateTime() {
-    if (startTime == null || endTime == null) return false;
-    final start = Duration(hours: startTime!.hour, minutes: startTime!.minute);
-    final end = Duration(hours: endTime!.hour, minutes: endTime!.minute);
-    return end > start;
-  }
-
-  void goToResults() {
-    if (selectedDay == null) {
-      _showSnackBar("Please select a day");
-      return;
-    }
-
-    if (startTime == null || endTime == null) {
-      _showSnackBar("Please select both start and end time");
-      return;
-    }
-
-    if (!validateTime()) {
-      _showSnackBar("End time should be after start time");
-      return;
-    }
-
-    Navigator.pushNamed(
-      context,
-      '/results',
-      arguments: {
-        'day': selectedDay,
-        'startTime': startTime,
-        'endTime': endTime,
-        'searchQuery': searchQuery,
-      },
-    );
+  void resetTimetableFields() {
+    setState(() {
+      selectedTeacher = null;
+      selectedTimetableDay = null;
+      selectedTime = null;
+      timetableResult.clear();
+    });
   }
 
   void _showSnackBar(String msg) {
@@ -153,368 +199,61 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final gradient = LinearGradient(
-      colors: isDarkMode
-          ? [Colors.indigo[900]!, Colors.black]
-          : [Colors.indigo[100]!, Colors.white],
-      begin: Alignment.topLeft,
-      end: Alignment.bottomRight,
-    );
-
-    final List<String> suggestions = searchQuery.isEmpty
-        ? []
-        : teacherNames
-            .where((name) => name.toLowerCase().contains(searchQuery.toLowerCase()))
-            .toList();
-
-    return Scaffold(
-      resizeToAvoidBottomInset: true,
-      extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        elevation: 0,
-        backgroundColor: Colors.transparent,
-        title: Text(
-          'Find My Faculty',
+  Widget _buildDropdown(String label, String? value, List<String> items, ValueChanged<String?> onChanged) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
           style: TextStyle(
-            color: isDarkMode ? Colors.white : Colors.indigo[900],
-            fontWeight: FontWeight.bold,
-            fontSize: 24,
-            letterSpacing: 1.2,
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: isDarkMode ? Colors.white : Colors.indigo[800],
           ),
         ),
-        actions: [
-          IconButton(
-            icon: Icon(isDarkMode ? Icons.light_mode : Icons.dark_mode,
-                color: isDarkMode ? Colors.amber : Colors.indigo),
-            onPressed: () {
-              setState(() {
-                isDarkMode = !isDarkMode;
-              });
-            },
-          )
-        ],
-      ),
-      body: SafeArea(
-        child: Container(
-          decoration: BoxDecoration(gradient: gradient),
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
-            child: Column(
-              children: [
-                Card(
-                  elevation: 18,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-                  color: isDarkMode ? Colors.indigo[900] : Colors.white,
-                  shadowColor: Colors.indigo.withOpacity(0.3),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 24),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Center(
-                          child: Text(
-                            "Check Teacher Availability",
-                            style: TextStyle(
-                              fontSize: 26,
-                              fontWeight: FontWeight.bold,
-                              color: isDarkMode ? Colors.white : Colors.indigo[900],
-                              letterSpacing: 1.1,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-                        TextField(
-                          controller: searchController, // ✅ Add controller
-                          onChanged: (value) {
-                            setState(() {
-                              searchQuery = value;
-                            });
-                          },
-                          style: TextStyle(
-                            color: isDarkMode ? Colors.white : Colors.indigo[900],
-                            fontWeight: FontWeight.w500,
-                          ),
-                          decoration: InputDecoration(
-                            hintText: 'Search teacher by name or keyword...',
-                            hintStyle: TextStyle(
-                              color: isDarkMode ? Colors.white54 : Colors.indigo[300],
-                            ),
-                            prefixIcon:
-                                Icon(Icons.search, color: isDarkMode ? Colors.amber : Colors.indigo),
-                            filled: true,
-                            fillColor: isDarkMode ? Colors.indigo[800] : Colors.indigo[50],
-                            contentPadding:
-                                const EdgeInsets.symmetric(vertical: 18, horizontal: 18),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(16),
-                              borderSide: BorderSide.none,
-                            ),
-                          ),
-                        ),
-                        if (suggestions.isNotEmpty) ...[
-                          const SizedBox(height: 8),
-                          Container(
-                            decoration: BoxDecoration(
-                              color: isDarkMode ? Colors.indigo[800] : Colors.indigo[50],
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: ListView.builder(
-                              shrinkWrap: true,
-                              physics: const NeverScrollableScrollPhysics(),
-                              itemCount: suggestions.length,
-                              itemBuilder: (context, index) {
-                                return ListTile(
-                                  title: Text(
-                                    suggestions[index],
-                                    style: TextStyle(
-                                      color: isDarkMode ? Colors.white : Colors.indigo[900],
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                  onTap: () {
-                                    setState(() {
-                                      searchQuery = suggestions[index];          // ✅ auto-fill
-                                      searchController.text = suggestions[index]; // ✅ fill TextField
-                                      searchQuery = '';                          // ✅ hide suggestions
-                                    });
-                                  },
-                                );
-                              },
-                            ),
-                          ),
-                        ],
-                        const SizedBox(height: 18),
-
-                        // ✅ Step 2: Add the "Open Teacher Timetable" button
-                        ElevatedButton.icon(
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const TeacherTimetableScreen(),
-                              ),
-                            );
-                          },
-                          icon: const Icon(Icons.schedule),
-                          label: const Text("Open Teacher Timetable"),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.indigo,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            textStyle: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                        ),
-
-                        const SizedBox(height: 28),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: ElevatedButton.icon(
-                                onPressed: resetFields,
-                                icon: const Icon(Icons.refresh),
-                                label: const Text('Reset'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor:
-                                      isDarkMode ? Colors.indigo[700] : Colors.indigo[200],
-                                  foregroundColor:
-                                      isDarkMode ? Colors.white : Colors.indigo[900],
-                                  elevation: 0,
-                                  padding: const EdgeInsets.symmetric(vertical: 16),
-                                  shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(14)),
-                                  textStyle: const TextStyle(fontWeight: FontWeight.bold),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 24),
-                            Expanded(
-                              child: ElevatedButton.icon(
-                                onPressed: goToResults,
-                                icon: const Icon(Icons.search),
-                                label: const Text('Find Teachers'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: isDarkMode ? Colors.amber : Colors.indigo,
-                                  foregroundColor:
-                                      isDarkMode ? Colors.indigo[900] : Colors.white,
-                                  elevation: 0,
-                                  padding: const EdgeInsets.symmetric(vertical: 16),
-                                  shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(14)),
-                                  textStyle: const TextStyle(fontWeight: FontWeight.bold),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
+        const SizedBox(height: 8),
+        Container(
+          decoration: BoxDecoration(
+            color: isDarkMode ? Colors.indigo[800] : Colors.indigo[50],
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isDarkMode ? Colors.indigo[600]! : Colors.indigo[200]!,
+            ),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: value,
+              isExpanded: true,
+              icon: Icon(Icons.arrow_drop_down, color: isDarkMode ? Colors.white : Colors.indigo),
+              hint: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Text(
+                  'Select $label',
+                  style: TextStyle(
+                    color: isDarkMode ? Colors.white60 : Colors.indigo[400],
                   ),
                 ),
-              ],
+              ),
+              items: items.map((String item) {
+                return DropdownMenuItem<String>(
+                  value: item,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Text(
+                      item,
+                      style: TextStyle(
+                        color: isDarkMode ? Colors.white : Colors.indigo[900],
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+              onChanged: onChanged,
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-*/
-
-import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
-import 'teacher_timetable_screen.dart'; // ✅ Step 2: Import timetable screen
-
-class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
-
-  @override
-  State<HomeScreen> createState() => _HomeScreenState();
-}
-
-class _HomeScreenState extends State<HomeScreen> {
-  final List<String> days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
-  final List<String> teacherNames = [
-    'Dr. Sharma',
-    'Ms. Gupta',
-    'Mr. Khan',
-    'Prof. Verma',
-    'Mrs. Singh',
-    'Dr. Patel',
-    'Ms. Roy',
-    'Mr. Das',
-    'Prof. Mehta',
-    'Mrs. Joshi',
-  ];
-
-  String? selectedDay;
-  TimeOfDay? startTime;
-  TimeOfDay? endTime;
-  bool isDarkMode = false;
-  String searchQuery = '';
-
-  final TextEditingController searchController = TextEditingController();
-
-  String formatTime(TimeOfDay time) {
-    final now = DateTime.now();
-    final dt = DateTime(now.year, now.month, now.day, time.hour, time.minute);
-    return DateFormat.jm().format(dt);
-  }
-
-  Future<void> pickTime(bool isStart) async {
-    final TimeOfDay? picked = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.now(),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.light(
-              primary: Colors.indigo,
-              onPrimary: Colors.white,
-              surface: Colors.white,
-              onSurface: Colors.indigo[900]!,
-            ),
-            dialogBackgroundColor: Colors.white,
-          ),
-          child: child!,
-        );
-      },
-    );
-
-    if (picked != null) {
-      final int selectedMinutes = picked.hour * 60 + picked.minute;
-      const int minMinutes = 8 * 60;
-      const int maxMinutes = 15 * 60;
-
-      if (selectedMinutes < minMinutes || selectedMinutes > maxMinutes) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Please select time between 8:00 AM and 3:00 PM'),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
-        return;
-      }
-
-      setState(() {
-        if (isStart) {
-          startTime = picked;
-          endTime ??= TimeOfDay(
-            hour: (picked.hour + 1).clamp(8, 15),
-            minute: picked.minute,
-          );
-        } else {
-          endTime = picked;
-        }
-      });
-    }
-  }
-
-  void resetFields() {
-    setState(() {
-      selectedDay = null;
-      startTime = null;
-      endTime = null;
-      searchQuery = '';
-      searchController.clear();
-    });
-  }
-
-  void swapTimes() {
-    if (startTime != null && endTime != null) {
-      setState(() {
-        final temp = startTime;
-        startTime = endTime;
-        endTime = temp;
-      });
-    }
-  }
-
-  bool validateTime() {
-    if (startTime == null || endTime == null) return false;
-    final start = Duration(hours: startTime!.hour, minutes: startTime!.minute);
-    final end = Duration(hours: endTime!.hour, minutes: endTime!.minute);
-    return end > start;
-  }
-
-  void goToResults() {
-    if (selectedDay == null) {
-      _showSnackBar("Please select a day");
-      return;
-    }
-
-    if (startTime == null || endTime == null) {
-      _showSnackBar("Please select both start and end time");
-      return;
-    }
-
-    if (!validateTime()) {
-      _showSnackBar("End time should be after start time");
-      return;
-    }
-
-    Navigator.pushNamed(
-      context,
-      '/results',
-      arguments: {
-        'day': selectedDay,
-        'startTime': startTime,
-        'endTime': endTime,
-        'searchQuery': searchQuery,
-      },
-    );
-  }
-
-  void _showSnackBar(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(msg),
-        backgroundColor: Colors.indigo,
-      ),
+      ],
     );
   }
 
@@ -528,12 +267,6 @@ class _HomeScreenState extends State<HomeScreen> {
       end: Alignment.bottomRight,
     );
 
-    final List<String> suggestions = searchQuery.isEmpty
-        ? []
-        : teacherNames
-            .where((name) => name.toLowerCase().contains(searchQuery.toLowerCase()))
-            .toList();
-
     return Scaffold(
       resizeToAvoidBottomInset: true,
       extendBodyBehindAppBar: true,
@@ -541,7 +274,7 @@ class _HomeScreenState extends State<HomeScreen> {
         elevation: 0,
         backgroundColor: Colors.transparent,
         title: Text(
-          'Find My Faculty',
+          'Faculty Timetable',
           style: TextStyle(
             color: isDarkMode ? Colors.white : Colors.indigo[900],
             fontWeight: FontWeight.bold,
@@ -571,160 +304,249 @@ class _HomeScreenState extends State<HomeScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
                   child: Column(
                     children: [
+                      // Timetable Section - Only Card
                       Card(
                         elevation: 18,
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(28)),
+                          borderRadius: BorderRadius.circular(28),
+                        ),
                         color: isDarkMode ? Colors.indigo[900] : Colors.white,
                         shadowColor: Colors.indigo.withOpacity(0.3),
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 18, vertical: 24),
+                          padding: const EdgeInsets.all(24),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              Center(
-                                child: Text(
-                                  "Check Teacher Availability",
-                                  style: TextStyle(
-                                    fontSize: 26,
-                                    fontWeight: FontWeight.bold,
-                                    color:
-                                        isDarkMode ? Colors.white : Colors.indigo[900],
-                                    letterSpacing: 1.1,
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.schedule,
+                                    color: isDarkMode ? Colors.amber : Colors.indigo,
+                                    size: 28,
                                   ),
+                                  const SizedBox(width: 12),
+                                  Text(
+                                    "Teacher Timetable",
+                                    style: TextStyle(
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.bold,
+                                      color: isDarkMode ? Colors.white : Colors.indigo[900],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                "View complete schedule of teachers",
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: isDarkMode ? Colors.white70 : Colors.indigo[600],
                                 ),
                               ),
                               const SizedBox(height: 24),
-                              TextField(
-                                controller: searchController,
-                                onChanged: (value) {
-                                  setState(() {
-                                    searchQuery = value;
-                                  });
-                                },
-                                style: TextStyle(
-                                  color: isDarkMode ? Colors.white : Colors.indigo[900],
-                                  fontWeight: FontWeight.w500,
-                                ),
-                                decoration: InputDecoration(
-                                  hintText: 'Search teacher by name or keyword...',
-                                  hintStyle: TextStyle(
-                                    color: isDarkMode ? Colors.white54 : Colors.indigo[300],
-                                  ),
-                                  prefixIcon: Icon(Icons.search,
-                                      color: isDarkMode ? Colors.amber : Colors.indigo),
-                                  filled: true,
-                                  fillColor: isDarkMode ? Colors.indigo[800] : Colors.indigo[50],
-                                  contentPadding: const EdgeInsets.symmetric(
-                                      vertical: 18, horizontal: 18),
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                    borderSide: BorderSide.none,
-                                  ),
-                                ),
-                              ),
-                              if (suggestions.isNotEmpty) ...[
-                                const SizedBox(height: 8),
-                                Container(
-                                  decoration: BoxDecoration(
-                                    color: isDarkMode ? Colors.indigo[800] : Colors.indigo[50],
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: ListView.builder(
-                                    shrinkWrap: true,
-                                    physics: const NeverScrollableScrollPhysics(),
-                                    itemCount: suggestions.length,
-                                    itemBuilder: (context, index) {
-                                      return ListTile(
-                                        title: Text(
-                                          suggestions[index],
-                                          style: TextStyle(
-                                            color:
-                                                isDarkMode ? Colors.white : Colors.indigo[900],
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        ),
-                                        onTap: () {
-                                          setState(() {
-                                            searchController.text = suggestions[index];
-                                            searchQuery = '';
-                                          });
-                                        },
-                                      );
-                                    },
-                                  ),
-                                ),
-                              ],
-                              const SizedBox(height: 18),
-                              ElevatedButton.icon(
-                                onPressed: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) => const TeacherTimetableScreen(),
-                                    ),
-                                  );
-                                },
-                                icon: const Icon(Icons.schedule),
-                                label: const Text("Open Teacher Timetable"),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.indigo,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(vertical: 16),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(14),
-                                  ),
-                                  textStyle:
-                                      const TextStyle(fontWeight: FontWeight.bold),
-                                ),
-                              ),
+
+                              // Loading indicator for teachers
+                              if (isLoading && teachers.isEmpty)
+                                const Center(child: CircularProgressIndicator()),
+
+                              // Teacher Dropdown
+                              _buildDropdown('Teacher', selectedTeacher, teachers, (value) {
+                                setState(() {
+                                  selectedTeacher = value;
+                                });
+                              }),
+
+                              const SizedBox(height: 20),
+
+                              // Day Dropdown
+                              _buildDropdown('Day', selectedTimetableDay, days, (value) {
+                                setState(() {
+                                  selectedTimetableDay = value;
+                                });
+                              }),
+
+                              const SizedBox(height: 20),
+
+                              // Time Dropdown (Optional)
+                              _buildDropdown('Time Slot (Optional)', selectedTime, times, (value) {
+                                setState(() {
+                                  selectedTime = value;
+                                });
+                              }),
+
                               const SizedBox(height: 28),
+
+                              // Action Buttons
                               Row(
                                 children: [
                                   Expanded(
-                                    child: ElevatedButton.icon(
-                                      onPressed: resetFields,
+                                    child: OutlinedButton.icon(
+                                      onPressed: resetTimetableFields,
                                       icon: const Icon(Icons.refresh),
-                                      label: const Text('Reset'),
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: isDarkMode
-                                            ? Colors.indigo[700]
-                                            : Colors.indigo[200],
-                                        foregroundColor:
-                                            isDarkMode ? Colors.white : Colors.indigo[900],
-                                        elevation: 0,
+                                      label: const Text('Reset All'),
+                                      style: OutlinedButton.styleFrom(
                                         padding: const EdgeInsets.symmetric(vertical: 16),
                                         shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(14)),
-                                        textStyle:
-                                            const TextStyle(fontWeight: FontWeight.bold),
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        side: BorderSide(
+                                          color: isDarkMode ? Colors.indigo[600]! : Colors.indigo,
+                                        ),
                                       ),
                                     ),
                                   ),
-                                  const SizedBox(width: 24),
+                                  const SizedBox(width: 16),
                                   Expanded(
                                     child: ElevatedButton.icon(
-                                      onPressed: goToResults,
-                                      icon: const Icon(Icons.search),
-                                      label: const Text('Find Teachers'),
+                                      onPressed: isLoading ? null : showTimetable,
+                                      icon: isLoading 
+                                          ? const SizedBox(
+                                              width: 16,
+                                              height: 16,
+                                              child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.white)),
+                                            )
+                                          : const Icon(Icons.schedule),
+                                      label: isLoading ? const Text('Loading...') : const Text('Show Timetable'),
                                       style: ElevatedButton.styleFrom(
-                                        backgroundColor:
-                                            isDarkMode ? Colors.amber : Colors.indigo,
-                                        foregroundColor: isDarkMode
-                                            ? Colors.indigo[900]
-                                            : Colors.white,
-                                        elevation: 0,
+                                        backgroundColor: Colors.indigo,
+                                        foregroundColor: Colors.white,
                                         padding: const EdgeInsets.symmetric(vertical: 16),
                                         shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(14)),
-                                        textStyle:
-                                            const TextStyle(fontWeight: FontWeight.bold),
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
                                       ),
                                     ),
                                   ),
                                 ],
                               ),
+
+                              const SizedBox(height: 24),
+
+                              // Loading indicator for timetable
+                              if (isLoading && timetableResult.isEmpty)
+                                const Center(child: CircularProgressIndicator()),
+
+                              // Timetable Results
+                              if (timetableResult.isNotEmpty) ...[
+                                Container(
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    color: isDarkMode ? Colors.indigo[800] : Colors.indigo[50],
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Icon(
+                                            Icons.calendar_today,
+                                            color: isDarkMode ? Colors.amber : Colors.indigo,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            'Timetable for $selectedTeacher',
+                                            style: TextStyle(
+                                              fontSize: 18,
+                                              fontWeight: FontWeight.bold,
+                                              color: isDarkMode ? Colors.white : Colors.indigo[900],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        'Day: $selectedTimetableDay • ${timetableResult.length} classes',
+                                        style: TextStyle(
+                                          color: isDarkMode ? Colors.white70 : Colors.indigo[700],
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                ...timetableResult.map((lec) => Card(
+                                  elevation: 2,
+                                  margin: const EdgeInsets.only(bottom: 12),
+                                  color: isDarkMode ? Colors.indigo[700] : Colors.white,
+                                  child: ListTile(
+                                    leading: Container(
+                                      width: 50,
+                                      height: 50,
+                                      decoration: BoxDecoration(
+                                        color: isDarkMode ? Colors.indigo[600] : Colors.indigo[100],
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: Icon(
+                                        Icons.school,
+                                        color: isDarkMode ? Colors.amber : Colors.indigo,
+                                      ),
+                                    ),
+                                    title: Text(
+                                      lec['time']!,
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                        color: isDarkMode ? Colors.white : Colors.indigo[900],
+                                      ),
+                                    ),
+                                    subtitle: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Room: ${lec['room']}',
+                                          style: TextStyle(
+                                            color: isDarkMode ? Colors.white70 : Colors.indigo[700],
+                                          ),
+                                        ),
+                                        Text(
+                                          'Subject: ${lec['subject']}',
+                                          style: TextStyle(
+                                            color: isDarkMode ? Colors.white70 : Colors.indigo[700],
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    trailing: Icon(
+                                      Icons.arrow_forward_ios,
+                                      color: isDarkMode ? Colors.amber : Colors.indigo,
+                                      size: 16,
+                                    ),
+                                  ),
+                                )).toList(),
+                              ] else if (selectedTeacher != null && selectedTimetableDay != null && !isLoading) ...[
+                                Container(
+                                  padding: const EdgeInsets.all(40),
+                                  child: Column(
+                                    children: [
+                                      Icon(
+                                        Icons.schedule_send,
+                                        size: 64,
+                                        color: isDarkMode ? Colors.indigo[300] : Colors.indigo[200],
+                                      ),
+                                      const SizedBox(height: 16),
+                                      Text(
+                                        'No classes scheduled',
+                                        style: TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.w500,
+                                          color: isDarkMode ? Colors.white70 : Colors.indigo[600],
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        'Select different day or time slot',
+                                        style: TextStyle(
+                                          color: isDarkMode ? Colors.white54 : Colors.indigo[400],
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ],
                           ),
                         ),
@@ -733,7 +555,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
               ),
-              // ✅ Sticky Quote at the bottom
+              // Sticky Quote at the bottom
               Container(
                 padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 18),
                 color: Colors.transparent,

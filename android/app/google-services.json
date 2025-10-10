@@ -1,6 +1,7 @@
 {
   "project_info": {
     "project_number": "318562081211",
+    "firebase_url": "https://teacherlocater-default-rtdb.asia-southeast1.firebasedatabase.app",
     "project_id": "teacherlocater",
     "storage_bucket": "teacherlocater.firebasestorage.app"
   },
