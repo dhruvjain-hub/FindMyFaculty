@@ -629,3 +629,5 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 }
+
+// In this version now timetable is added to the firebase 
