@@ -25,7 +25,7 @@ class _HomeScreenState extends State<HomeScreen> {
   
   // Lists to be populated from Firebase
   List<String> teachers = [];
-  List<String> times = ['9:00 - 10:00', '10:00 - 11:00', '11:00 - 12:00', '12:00 - 1:00', '2:00 - 3:00', '3:00 - 4:00'];
+  List<String> times = ['8:00 - 9:00', '9:00 - 10:00', '10:00 - 11:00', '11:00 - 12:00', '12:00 - 1:00', '1:00 - 2:00', '2:00 - 3:00', '3:00 - 4:00'];
 
   // Mapping between display names and Firebase keys
   final Map<String, String> _teacherKeyMap = {};
@@ -245,6 +245,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         color: isDarkMode ? Colors.white : Colors.indigo[900],
                         fontWeight: FontWeight.w500,
                       ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 );
@@ -376,48 +377,95 @@ class _HomeScreenState extends State<HomeScreen> {
 
                               const SizedBox(height: 28),
 
-                              // Action Buttons
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: OutlinedButton.icon(
-                                      onPressed: resetTimetableFields,
-                                      icon: const Icon(Icons.refresh),
-                                      label: const Text('Reset All'),
-                                      style: OutlinedButton.styleFrom(
-                                        padding: const EdgeInsets.symmetric(vertical: 16),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(12),
+                              // Action Buttons - FIXED WITH SHORTER TEXT
+                              Container(
+                                height: 56,
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: OutlinedButton(
+                                        onPressed: resetTimetableFields,
+                                        style: OutlinedButton.styleFrom(
+                                          padding: const EdgeInsets.symmetric(vertical: 16),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(12),
+                                          ),
+                                          side: BorderSide(
+                                            color: isDarkMode ? Colors.indigo[600]! : Colors.indigo,
+                                            width: 2,
+                                          ),
                                         ),
-                                        side: BorderSide(
-                                          color: isDarkMode ? Colors.indigo[600]! : Colors.indigo,
+                                        child: Row(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          children: [
+                                            Icon(
+                                              Icons.refresh,
+                                              size: 20,
+                                              color: isDarkMode ? Colors.white : Colors.indigo,
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Text(
+                                              'Reset',
+                                              style: TextStyle(
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.w600,
+                                                color: isDarkMode ? Colors.white : Colors.indigo,
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ),
                                     ),
-                                  ),
-                                  const SizedBox(width: 16),
-                                  Expanded(
-                                    child: ElevatedButton.icon(
-                                      onPressed: isLoading ? null : showTimetable,
-                                      icon: isLoading 
-                                          ? const SizedBox(
-                                              width: 16,
-                                              height: 16,
-                                              child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.white)),
-                                            )
-                                          : const Icon(Icons.schedule),
-                                      label: isLoading ? const Text('Loading...') : const Text('Show Timetable'),
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: Colors.indigo,
-                                        foregroundColor: Colors.white,
-                                        padding: const EdgeInsets.symmetric(vertical: 16),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(12),
+                                    const SizedBox(width: 16),
+                                    Expanded(
+                                      child: ElevatedButton(
+                                        onPressed: isLoading ? null : showTimetable,
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.indigo,
+                                          foregroundColor: Colors.white,
+                                          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(12),
+                                          ),
+                                          elevation: 4,
+                                          shadowColor: Colors.indigo.withOpacity(0.3),
                                         ),
+                                        child: isLoading
+                                            ? SizedBox(
+                                                height: 20,
+                                                width: 20,
+                                                child: CircularProgressIndicator(
+                                                  strokeWidth: 2,
+                                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                                ),
+                                              )
+                                            : Row(
+                                                mainAxisAlignment: MainAxisAlignment.center,
+                                                children: [
+                                                  Icon(
+                                                    Icons.schedule,
+                                                    size: 20,
+                                                    color: Colors.white,
+                                                  ),
+                                                  const SizedBox(width: 6),
+                                                  Flexible(
+                                                    child: Text(
+                                                      'Show Schedule',
+                                                      style: TextStyle(
+                                                        fontSize: 15, // Slightly smaller font
+                                                        fontWeight: FontWeight.w600,
+                                                        color: Colors.white,
+                                                      ),
+                                                      overflow: TextOverflow.ellipsis,
+                                                      maxLines: 1,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
                                       ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
 
                               const SizedBox(height: 24),
@@ -444,12 +492,16 @@ class _HomeScreenState extends State<HomeScreen> {
                                             color: isDarkMode ? Colors.amber : Colors.indigo,
                                           ),
                                           const SizedBox(width: 8),
-                                          Text(
-                                            'Timetable for $selectedTeacher',
-                                            style: TextStyle(
-                                              fontSize: 18,
-                                              fontWeight: FontWeight.bold,
-                                              color: isDarkMode ? Colors.white : Colors.indigo[900],
+                                          Expanded(
+                                            child: Text(
+                                              'Timetable for $selectedTeacher',
+                                              style: TextStyle(
+                                                fontSize: 18,
+                                                fontWeight: FontWeight.bold,
+                                                color: isDarkMode ? Colors.white : Colors.indigo[900],
+                                              ),
+                                              overflow: TextOverflow.ellipsis,
+                                              maxLines: 2,
                                             ),
                                           ),
                                         ],
@@ -506,6 +558,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                             color: isDarkMode ? Colors.white70 : Colors.indigo[700],
                                             fontWeight: FontWeight.w500,
                                           ),
+                                          overflow: TextOverflow.ellipsis,
                                         ),
                                       ],
                                     ),
