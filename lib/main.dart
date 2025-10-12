@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'screens/home_screen.dart';
-import 'screens/results_screen.dart';
 import 'screens/splash_screen.dart';
 import 'package:firebase_core/firebase_core.dart';
 
@@ -25,7 +24,6 @@ class FindMyFacultyApp extends StatelessWidget {
       routes: {
         '/': (context) => const SplashScreen(),   // Splash shown first
         '/home': (context) => const HomeScreen(), // Home screen after splash
-        '/results': (context) => const ResultsScreen(), // Result screen
       },
     );
   }
