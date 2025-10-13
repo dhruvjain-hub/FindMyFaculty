@@ -11,11 +11,17 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final List<String> days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
-  
+  final List<String> days = [
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+  ];
+
   // Firebase Database Reference
   final DatabaseReference _databaseRef = FirebaseDatabase.instance.ref();
-  
+
   // Timetable Variables
   String? selectedTeacher;
   String? selectedTimetableDay;
@@ -23,25 +29,34 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Map<String, String>> timetableResult = [];
   bool isDarkMode = false;
   bool isLoading = false;
-  
+
   // Drawer state
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
-  
+
   // View mode
   String currentView = 'Timetable';
 
   // Lists to be populated from Firebase
   List<String> teachers = [];
-  List<String> times = ['8:00 - 9:00', '9:00 - 10:00', '10:00 - 11:00', '11:00 - 12:00', '12:00 - 1:00', '1:00 - 2:00', '2:00 - 3:00', '3:00 - 4:00'];
+  List<String> times = [
+    '8:00 - 9:00',
+    '9:00 - 10:00',
+    '10:00 - 11:00',
+    '11:00 - 12:00',
+    '12:00 - 1:00',
+    '1:00 - 2:00',
+    '2:00 - 3:00',
+    '3:00 - 4:00',
+  ];
 
   // Mapping between display names and Firebase keys
   final Map<String, String> _teacherKeyMap = {};
   final Map<String, String> _dayKeyMap = {
     'Monday': 'monday',
     'Tuesday': 'tuesday',
-    'Wednesday': 'wednesday', 
+    'Wednesday': 'wednesday',
     'Thursday': 'thursday',
-    'Friday': 'friday'
+    'Friday': 'friday',
   };
 
   @override
@@ -68,32 +83,44 @@ class _HomeScreenState extends State<HomeScreen> {
 
     try {
       final snapshot = await _databaseRef.child('teachers').get();
-      
+
       if (snapshot.exists) {
         final data = snapshot.value as Map<dynamic, dynamic>;
         final teacherList = <String>[];
         _teacherKeyMap.clear();
-        
+
         data.forEach((key, value) {
           final teacherKey = key.toString();
           final teacherName = value.toString();
           teacherList.add(teacherName);
           _teacherKeyMap[teacherName] = teacherKey;
         });
-        
+
         setState(() {
           teachers = teacherList;
         });
       } else {
         // If no teachers found, use default list
         setState(() {
-          teachers = ['Mr. Sharma', 'Ms. Gupta', 'Mr. Khan', 'Prof. Verma', 'Mrs. Singh'];
+          teachers = [
+            'Mr. Sharma',
+            'Ms. Gupta',
+            'Mr. Khan',
+            'Prof. Verma',
+            'Mrs. Singh',
+          ];
         });
       }
     } catch (e) {
       print("Error loading teachers: $e");
       setState(() {
-        teachers = ['Mr. Sharma', 'Ms. Gupta', 'Mr. Khan', 'Prof. Verma', 'Mrs. Singh'];
+        teachers = [
+          'Mr. Sharma',
+          'Ms. Gupta',
+          'Mr. Khan',
+          'Prof. Verma',
+          'Mrs. Singh',
+        ];
       });
     } finally {
       setState(() {
@@ -123,7 +150,7 @@ class _HomeScreenState extends State<HomeScreen> {
       // Convert display names to Firebase keys
       final teacherKey = _teacherKeyMap[selectedTeacher!];
       final dayKey = _dayKeyMap[selectedTimetableDay!];
-      
+
       if (teacherKey == null || dayKey == null) {
         throw Exception('Could not find Firebase keys for selection');
       }
@@ -150,11 +177,13 @@ class _HomeScreenState extends State<HomeScreen> {
 
         // Filter by selected time if specified
         if (selectedTime != null) {
-          final filteredClasses = classes.where((lec) => lec['time'] == selectedTime).toList();
+          final filteredClasses = classes
+              .where((lec) => lec['time'] == selectedTime)
+              .toList();
           setState(() {
             timetableResult = filteredClasses;
           });
-          
+
           if (filteredClasses.isEmpty) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('No lecture found for that time')),
@@ -199,10 +228,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _showSnackBar(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(msg),
-        backgroundColor: Colors.indigo,
-      ),
+      SnackBar(content: Text(msg), backgroundColor: Colors.indigo),
     );
   }
 
@@ -216,7 +242,12 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildDropdown(String label, String? value, List<String> items, ValueChanged<String?> onChanged) {
+  Widget _buildDropdown(
+    String label,
+    String? value,
+    List<String> items,
+    ValueChanged<String?> onChanged,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -241,7 +272,10 @@ class _HomeScreenState extends State<HomeScreen> {
             child: DropdownButton<String>(
               value: value,
               isExpanded: true,
-              icon: Icon(Icons.arrow_drop_down, color: isDarkMode ? Colors.white : Colors.indigo),
+              icon: Icon(
+                Icons.arrow_drop_down,
+                color: isDarkMode ? Colors.white : Colors.indigo,
+              ),
               hint: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 child: Text(
@@ -280,9 +314,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Drawer(
       backgroundColor: isDarkMode ? Colors.indigo[900] : Colors.white,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.horizontal(
-          right: Radius.circular(25),
-        ),
+        borderRadius: BorderRadius.horizontal(right: Radius.circular(25)),
       ),
       child: Container(
         decoration: BoxDecoration(
@@ -317,11 +349,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     top: 20,
                     left: 20,
                     child: IconButton(
-                      icon: Icon(
-                        Icons.close,
-                        color: Colors.white,
-                        size: 28,
-                      ),
+                      icon: Icon(Icons.close, color: Colors.white, size: 28),
                       onPressed: () {
                         _scaffoldKey.currentState?.closeDrawer();
                       },
@@ -378,8 +406,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     // Change View Section
                     _buildDrawerItem(
                       icon: Icons.dashboard,
-                      title: 'Change View',
-                      subtitle: 'Switch between different layouts',
+                      title: 'Teacher View',
+                      subtitle: 'Switch to teacher view',
                       isSelected: true,
                       onTap: _openFacultyInfoScreen,
                     ),
@@ -387,31 +415,49 @@ class _HomeScreenState extends State<HomeScreen> {
                     const Spacer(),
 
                     // App Info
+                    // Credits Section
                     Container(
                       margin: const EdgeInsets.all(20),
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: isDarkMode ? Colors.indigo[800] : Colors.indigo[100],
+                        color: isDarkMode
+                            ? Colors.indigo[800]
+                            : Colors.indigo[100],
                         borderRadius: BorderRadius.circular(15),
                       ),
                       child: Column(
                         children: [
                           Text(
-                            '📚 Faculty Timetable',
+                            'Developed by',
                             style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: isDarkMode ? Colors.white : Colors.indigo[900],
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: isDarkMode
+                                  ? Colors.white
+                                  : Colors.indigo[900],
                             ),
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            'Easily manage and view teacher schedules with beautiful interfaces',
+                            'Dhruv, Ankit, Arpit',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: isDarkMode
+                                  ? Colors.amber
+                                  : Colors.indigo[700],
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            '© 2025 All Rights Reserved',
                             style: TextStyle(
                               fontSize: 12,
-                              color: isDarkMode ? Colors.white70 : Colors.indigo[700],
+                              color: isDarkMode
+                                  ? Colors.white70
+                                  : Colors.indigo[600],
+                              fontStyle: FontStyle.italic,
                             ),
-                            textAlign: TextAlign.center,
                           ),
                         ],
                       ),
@@ -441,7 +487,10 @@ class _HomeScreenState extends State<HomeScreen> {
             : Colors.transparent,
         borderRadius: BorderRadius.circular(15),
         border: isSelected
-            ? Border.all(color: isDarkMode ? Colors.amber : Colors.indigo, width: 2)
+            ? Border.all(
+                color: isDarkMode ? Colors.amber : Colors.indigo,
+                width: 2,
+              )
             : null,
       ),
       child: ListTile(
@@ -452,10 +501,7 @@ class _HomeScreenState extends State<HomeScreen> {
             color: isDarkMode ? Colors.indigo[600] : Colors.indigo[50],
             borderRadius: BorderRadius.circular(12),
           ),
-          child: Icon(
-            icon,
-            color: isDarkMode ? Colors.amber : Colors.indigo,
-          ),
+          child: Icon(icon, color: isDarkMode ? Colors.amber : Colors.indigo),
         ),
         title: Text(
           title,
@@ -505,7 +551,9 @@ class _HomeScreenState extends State<HomeScreen> {
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: isDarkMode ? Colors.indigo[800] : Colors.white.withOpacity(0.9),
+              color: isDarkMode
+                  ? Colors.indigo[800]
+                  : Colors.white.withOpacity(0.9),
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
@@ -539,7 +587,9 @@ class _HomeScreenState extends State<HomeScreen> {
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: isDarkMode ? Colors.indigo[800] : Colors.white.withOpacity(0.9),
+                color: isDarkMode
+                    ? Colors.indigo[800]
+                    : Colors.white.withOpacity(0.9),
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
@@ -559,7 +609,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 isDarkMode = !isDarkMode;
               });
             },
-          )
+          ),
         ],
       ),
       body: SafeArea(
@@ -569,7 +619,10 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               Expanded(
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 18,
+                    vertical: 20,
+                  ),
                   child: Column(
                     children: [
                       // Timetable Section - Only Card
@@ -589,7 +642,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                 children: [
                                   Icon(
                                     Icons.schedule,
-                                    color: isDarkMode ? Colors.amber : Colors.indigo,
+                                    color: isDarkMode
+                                        ? Colors.amber
+                                        : Colors.indigo,
                                     size: 28,
                                   ),
                                   const SizedBox(width: 12),
@@ -598,7 +653,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                     style: TextStyle(
                                       fontSize: 24,
                                       fontWeight: FontWeight.bold,
-                                      color: isDarkMode ? Colors.white : Colors.indigo[900],
+                                      color: isDarkMode
+                                          ? Colors.white
+                                          : Colors.indigo[900],
                                     ),
                                   ),
                                 ],
@@ -608,39 +665,58 @@ class _HomeScreenState extends State<HomeScreen> {
                                 "View complete schedule of teachers",
                                 style: TextStyle(
                                   fontSize: 14,
-                                  color: isDarkMode ? Colors.white70 : Colors.indigo[600],
+                                  color: isDarkMode
+                                      ? Colors.white70
+                                      : Colors.indigo[600],
                                 ),
                               ),
                               const SizedBox(height: 24),
 
                               // Loading indicator for teachers
                               if (isLoading && teachers.isEmpty)
-                                const Center(child: CircularProgressIndicator()),
+                                const Center(
+                                  child: CircularProgressIndicator(),
+                                ),
 
                               // Teacher Dropdown
-                              _buildDropdown('Teacher', selectedTeacher, teachers, (value) {
-                                setState(() {
-                                  selectedTeacher = value;
-                                });
-                              }),
+                              _buildDropdown(
+                                'Teacher',
+                                selectedTeacher,
+                                teachers,
+                                (value) {
+                                  setState(() {
+                                    selectedTeacher = value;
+                                  });
+                                },
+                              ),
 
                               const SizedBox(height: 20),
 
                               // Day Dropdown
-                              _buildDropdown('Day', selectedTimetableDay, days, (value) {
-                                setState(() {
-                                  selectedTimetableDay = value;
-                                });
-                              }),
+                              _buildDropdown(
+                                'Day',
+                                selectedTimetableDay,
+                                days,
+                                (value) {
+                                  setState(() {
+                                    selectedTimetableDay = value;
+                                  });
+                                },
+                              ),
 
                               const SizedBox(height: 20),
 
                               // Time Dropdown (Optional)
-                              _buildDropdown('Time Slot (Optional)', selectedTime, times, (value) {
-                                setState(() {
-                                  selectedTime = value;
-                                });
-                              }),
+                              _buildDropdown(
+                                'Time Slot (Optional)',
+                                selectedTime,
+                                times,
+                                (value) {
+                                  setState(() {
+                                    selectedTime = value;
+                                  });
+                                },
+                              ),
 
                               const SizedBox(height: 28),
 
@@ -653,22 +729,31 @@ class _HomeScreenState extends State<HomeScreen> {
                                       child: OutlinedButton(
                                         onPressed: resetTimetableFields,
                                         style: OutlinedButton.styleFrom(
-                                          padding: const EdgeInsets.symmetric(vertical: 16),
+                                          padding: const EdgeInsets.symmetric(
+                                            vertical: 16,
+                                          ),
                                           shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(12),
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
                                           ),
                                           side: BorderSide(
-                                            color: isDarkMode ? Colors.indigo[600]! : Colors.indigo,
+                                            color: isDarkMode
+                                                ? Colors.indigo[600]!
+                                                : Colors.indigo,
                                             width: 2,
                                           ),
                                         ),
                                         child: Row(
-                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
                                           children: [
                                             Icon(
                                               Icons.refresh,
                                               size: 20,
-                                              color: isDarkMode ? Colors.white : Colors.indigo,
+                                              color: isDarkMode
+                                                  ? Colors.white
+                                                  : Colors.indigo,
                                             ),
                                             const SizedBox(width: 8),
                                             Text(
@@ -676,7 +761,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                               style: TextStyle(
                                                 fontSize: 16,
                                                 fontWeight: FontWeight.w600,
-                                                color: isDarkMode ? Colors.white : Colors.indigo,
+                                                color: isDarkMode
+                                                    ? Colors.white
+                                                    : Colors.indigo,
                                               ),
                                             ),
                                           ],
@@ -686,16 +773,24 @@ class _HomeScreenState extends State<HomeScreen> {
                                     const SizedBox(width: 16),
                                     Expanded(
                                       child: ElevatedButton(
-                                        onPressed: isLoading ? null : showTimetable,
+                                        onPressed: isLoading
+                                            ? null
+                                            : showTimetable,
                                         style: ElevatedButton.styleFrom(
                                           backgroundColor: Colors.indigo,
                                           foregroundColor: Colors.white,
-                                          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+                                          padding: const EdgeInsets.symmetric(
+                                            vertical: 16,
+                                            horizontal: 8,
+                                          ),
                                           shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(12),
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
                                           ),
                                           elevation: 4,
-                                          shadowColor: Colors.indigo.withOpacity(0.3),
+                                          shadowColor: Colors.indigo
+                                              .withOpacity(0.3),
                                         ),
                                         child: isLoading
                                             ? SizedBox(
@@ -703,11 +798,15 @@ class _HomeScreenState extends State<HomeScreen> {
                                                 width: 20,
                                                 child: CircularProgressIndicator(
                                                   strokeWidth: 2,
-                                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                                  valueColor:
+                                                      AlwaysStoppedAnimation<
+                                                        Color
+                                                      >(Colors.white),
                                                 ),
                                               )
                                             : Row(
-                                                mainAxisAlignment: MainAxisAlignment.center,
+                                                mainAxisAlignment:
+                                                    MainAxisAlignment.center,
                                                 children: [
                                                   Icon(
                                                     Icons.schedule,
@@ -719,11 +818,14 @@ class _HomeScreenState extends State<HomeScreen> {
                                                     child: Text(
                                                       'Show Schedule',
                                                       style: TextStyle(
-                                                        fontSize: 15, // Slightly smaller font
-                                                        fontWeight: FontWeight.w600,
+                                                        fontSize:
+                                                            15, // Slightly smaller font
+                                                        fontWeight:
+                                                            FontWeight.w600,
                                                         color: Colors.white,
                                                       ),
-                                                      overflow: TextOverflow.ellipsis,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
                                                       maxLines: 1,
                                                     ),
                                                   ),
@@ -739,24 +841,31 @@ class _HomeScreenState extends State<HomeScreen> {
 
                               // Loading indicator for timetable
                               if (isLoading && timetableResult.isEmpty)
-                                const Center(child: CircularProgressIndicator()),
+                                const Center(
+                                  child: CircularProgressIndicator(),
+                                ),
 
                               // Timetable Results
                               if (timetableResult.isNotEmpty) ...[
                                 Container(
                                   padding: const EdgeInsets.all(16),
                                   decoration: BoxDecoration(
-                                    color: isDarkMode ? Colors.indigo[800] : Colors.indigo[50],
+                                    color: isDarkMode
+                                        ? Colors.indigo[800]
+                                        : Colors.indigo[50],
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Row(
                                         children: [
                                           Icon(
                                             Icons.calendar_today,
-                                            color: isDarkMode ? Colors.amber : Colors.indigo,
+                                            color: isDarkMode
+                                                ? Colors.amber
+                                                : Colors.indigo,
                                           ),
                                           const SizedBox(width: 8),
                                           Expanded(
@@ -765,7 +874,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                               style: TextStyle(
                                                 fontSize: 18,
                                                 fontWeight: FontWeight.bold,
-                                                color: isDarkMode ? Colors.white : Colors.indigo[900],
+                                                color: isDarkMode
+                                                    ? Colors.white
+                                                    : Colors.indigo[900],
                                               ),
                                               overflow: TextOverflow.ellipsis,
                                               maxLines: 2,
@@ -777,7 +888,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                       Text(
                                         'Day: $selectedTimetableDay • ${timetableResult.length} classes',
                                         style: TextStyle(
-                                          color: isDarkMode ? Colors.white70 : Colors.indigo[700],
+                                          color: isDarkMode
+                                              ? Colors.white70
+                                              : Colors.indigo[700],
                                           fontSize: 14,
                                         ),
                                       ),
@@ -785,58 +898,82 @@ class _HomeScreenState extends State<HomeScreen> {
                                   ),
                                 ),
                                 const SizedBox(height: 16),
-                                ...timetableResult.map((lec) => Card(
-                                  elevation: 2,
-                                  margin: const EdgeInsets.only(bottom: 12),
-                                  color: isDarkMode ? Colors.indigo[700] : Colors.white,
-                                  child: ListTile(
-                                    leading: Container(
-                                      width: 50,
-                                      height: 50,
-                                      decoration: BoxDecoration(
-                                        color: isDarkMode ? Colors.indigo[600] : Colors.indigo[100],
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
-                                      child: Icon(
-                                        Icons.school,
-                                        color: isDarkMode ? Colors.amber : Colors.indigo,
-                                      ),
-                                    ),
-                                    title: Text(
-                                      lec['time']!,
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 16,
-                                        color: isDarkMode ? Colors.white : Colors.indigo[900],
-                                      ),
-                                    ),
-                                    subtitle: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          'Room: ${lec['room']}',
-                                          style: TextStyle(
-                                            color: isDarkMode ? Colors.white70 : Colors.indigo[700],
+                                ...timetableResult
+                                    .map(
+                                      (lec) => Card(
+                                        elevation: 2,
+                                        margin: const EdgeInsets.only(
+                                          bottom: 12,
+                                        ),
+                                        color: isDarkMode
+                                            ? Colors.indigo[700]
+                                            : Colors.white,
+                                        child: ListTile(
+                                          leading: Container(
+                                            width: 50,
+                                            height: 50,
+                                            decoration: BoxDecoration(
+                                              color: isDarkMode
+                                                  ? Colors.indigo[600]
+                                                  : Colors.indigo[100],
+                                              borderRadius:
+                                                  BorderRadius.circular(10),
+                                            ),
+                                            child: Icon(
+                                              Icons.school,
+                                              color: isDarkMode
+                                                  ? Colors.amber
+                                                  : Colors.indigo,
+                                            ),
+                                          ),
+                                          title: Text(
+                                            lec['time']!,
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 16,
+                                              color: isDarkMode
+                                                  ? Colors.white
+                                                  : Colors.indigo[900],
+                                            ),
+                                          ),
+                                          subtitle: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                'Room: ${lec['room']}',
+                                                style: TextStyle(
+                                                  color: isDarkMode
+                                                      ? Colors.white70
+                                                      : Colors.indigo[700],
+                                                ),
+                                              ),
+                                              Text(
+                                                'Subject: ${lec['subject']}',
+                                                style: TextStyle(
+                                                  color: isDarkMode
+                                                      ? Colors.white70
+                                                      : Colors.indigo[700],
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ],
+                                          ),
+                                          trailing: Icon(
+                                            Icons.arrow_forward_ios,
+                                            color: isDarkMode
+                                                ? Colors.amber
+                                                : Colors.indigo,
+                                            size: 16,
                                           ),
                                         ),
-                                        Text(
-                                          'Subject: ${lec['subject']}',
-                                          style: TextStyle(
-                                            color: isDarkMode ? Colors.white70 : Colors.indigo[700],
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ],
-                                    ),
-                                    trailing: Icon(
-                                      Icons.arrow_forward_ios,
-                                      color: isDarkMode ? Colors.amber : Colors.indigo,
-                                      size: 16,
-                                    ),
-                                  ),
-                                )).toList(),
-                              ] else if (selectedTeacher != null && selectedTimetableDay != null && !isLoading) ...[
+                                      ),
+                                    )
+                                    .toList(),
+                              ] else if (selectedTeacher != null &&
+                                  selectedTimetableDay != null &&
+                                  !isLoading) ...[
                                 Container(
                                   padding: const EdgeInsets.all(40),
                                   child: Column(
@@ -844,7 +981,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                       Icon(
                                         Icons.schedule_send,
                                         size: 64,
-                                        color: isDarkMode ? Colors.indigo[300] : Colors.indigo[200],
+                                        color: isDarkMode
+                                            ? Colors.indigo[300]
+                                            : Colors.indigo[200],
                                       ),
                                       const SizedBox(height: 16),
                                       Text(
@@ -852,14 +991,18 @@ class _HomeScreenState extends State<HomeScreen> {
                                         style: TextStyle(
                                           fontSize: 18,
                                           fontWeight: FontWeight.w500,
-                                          color: isDarkMode ? Colors.white70 : Colors.indigo[600],
+                                          color: isDarkMode
+                                              ? Colors.white70
+                                              : Colors.indigo[600],
                                         ),
                                       ),
                                       const SizedBox(height: 8),
                                       Text(
                                         'Select different day or time slot',
                                         style: TextStyle(
-                                          color: isDarkMode ? Colors.white54 : Colors.indigo[400],
+                                          color: isDarkMode
+                                              ? Colors.white54
+                                              : Colors.indigo[400],
                                         ),
                                         textAlign: TextAlign.center,
                                       ),
@@ -877,7 +1020,10 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               // Sticky Quote at the bottom
               Container(
-                padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 18),
+                padding: const EdgeInsets.symmetric(
+                  vertical: 20,
+                  horizontal: 18,
+                ),
                 color: Colors.transparent,
                 child: Text(
                   "“Study not to pass the exam, but to empower your future.” 💡📖",
