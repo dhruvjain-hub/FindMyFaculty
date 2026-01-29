@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_database/firebase_database.dart';
-import 'faculty_info_screen.dart'; // Import your faculty info screen
+import 'faculty_info_screen.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -11,21 +10,24 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final List<String> days = [
-    'Monday',
-    'Tuesday',
-    'Wednesday',
-    'Thursday',
-    'Friday',
-  ];
+  final Stream<QuerySnapshot> _teachersStream = FirebaseFirestore.instance
+      .collection('teachers')
+      .where('isActive', isEqualTo: true)
+      .snapshots();
+
+  final Stream<QuerySnapshot> _timetableStream = FirebaseFirestore.instance
+      .collection('timetable')
+      .where('isActive', isEqualTo: true)
+      .snapshots();
 
   // Firebase Database Reference
-  final DatabaseReference _databaseRef = FirebaseDatabase.instance.ref();
 
   // Timetable Variables
   String? selectedTeacher;
   String? selectedTimetableDay;
   String? selectedTime;
+  String? selectedTeacherName;
+
   List<Map<String, String>> timetableResult = [];
   bool isDarkMode = false;
   bool isLoading = false;
@@ -37,97 +39,12 @@ class _HomeScreenState extends State<HomeScreen> {
   String currentView = 'Timetable';
 
   // Lists to be populated from Firebase
-  List<String> teachers = [];
-  List<String> times = [
-    '8:00 - 9:00',
-    '9:00 - 10:00',
-    '10:00 - 11:00',
-    '11:00 - 12:00',
-    '12:00 - 1:00',
-    '1:00 - 2:00',
-    '2:00 - 3:00',
-    '3:00 - 4:00',
-  ];
 
   // Mapping between display names and Firebase keys
-  final Map<String, String> _teacherKeyMap = {};
-  final Map<String, String> _dayKeyMap = {
-    'Monday': 'monday',
-    'Tuesday': 'tuesday',
-    'Wednesday': 'wednesday',
-    'Thursday': 'thursday',
-    'Friday': 'friday',
-  };
-
-  @override
-  void initState() {
-    super.initState();
-    _initializeFirebase();
-  }
 
   // Initialize Firebase
-  Future<void> _initializeFirebase() async {
-    try {
-      await Firebase.initializeApp();
-      _loadTeachersFromFirebase();
-    } catch (e) {
-      print("Firebase initialization error: $e");
-    }
-  }
 
   // Load teachers list from Firebase
-  Future<void> _loadTeachersFromFirebase() async {
-    setState(() {
-      isLoading = true;
-    });
-
-    try {
-      final snapshot = await _databaseRef.child('teachers').get();
-
-      if (snapshot.exists) {
-        final data = snapshot.value as Map<dynamic, dynamic>;
-        final teacherList = <String>[];
-        _teacherKeyMap.clear();
-
-        data.forEach((key, value) {
-          final teacherKey = key.toString();
-          final teacherName = value.toString();
-          teacherList.add(teacherName);
-          _teacherKeyMap[teacherName] = teacherKey;
-        });
-
-        setState(() {
-          teachers = teacherList;
-        });
-      } else {
-        // If no teachers found, use default list
-        setState(() {
-          teachers = [
-            'Mr. Sharma',
-            'Ms. Gupta',
-            'Mr. Khan',
-            'Prof. Verma',
-            'Mrs. Singh',
-          ];
-        });
-      }
-    } catch (e) {
-      print("Error loading teachers: $e");
-      setState(() {
-        teachers = [
-          'Mr. Sharma',
-          'Ms. Gupta',
-          'Mr. Khan',
-          'Prof. Verma',
-          'Mrs. Singh',
-        ];
-      });
-    } finally {
-      setState(() {
-        isLoading = false;
-      });
-    }
-  }
 
   // Load timetable data from Firebase
   Future<void> showTimetable() async {
@@ -147,66 +64,40 @@ class _HomeScreenState extends State<HomeScreen> {
     });
 
     try {
-      // Convert display names to Firebase keys
-      final teacherKey = _teacherKeyMap[selectedTeacher!];
-      final dayKey = _dayKeyMap[selectedTimetableDay!];
+      Query query = FirebaseFirestore.instance
+          .collection('timetable')
+          .where('teacherId', isEqualTo: selectedTeacher)
+          .where('day', isEqualTo: selectedTimetableDay)
+          .where('isActive', isEqualTo: true);
 
-      if (teacherKey == null || dayKey == null) {
-        throw Exception('Could not find Firebase keys for selection');
+      if (selectedTime != null) {
+        query = query.where('time', isEqualTo: selectedTime);
       }
 
-      final snapshot = await _databaseRef
-          .child('timetable')
-          .child(teacherKey)
-          .child(dayKey)
-          .get();
+      final snapshot = await query.get();
 
-      if (snapshot.exists) {
-        final data = snapshot.value as Map<dynamic, dynamic>;
-        final List<Map<String, String>> classes = [];
-
-        data.forEach((key, value) {
-          if (value is Map<dynamic, dynamic>) {
-            classes.add({
-              'time': value['time']?.toString() ?? '',
-              'room': value['room']?.toString() ?? '',
-              'subject': value['subject']?.toString() ?? 'General Class',
-            });
-          }
-        });
-
-        // Filter by selected time if specified
-        if (selectedTime != null) {
-          final filteredClasses = classes
-              .where((lec) => lec['time'] == selectedTime)
-              .toList();
-          setState(() {
-            timetableResult = filteredClasses;
-          });
-
-          if (filteredClasses.isEmpty) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('No lecture found for that time')),
-            );
-          }
-        } else {
-          setState(() {
-            timetableResult = classes;
-          });
-        }
+      if (snapshot.docs.isEmpty) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('No classes found')));
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No classes found for this day')),
-        );
+        final results = snapshot.docs.map((doc) {
+          final data = doc.data() as Map<String, dynamic>;
+          return {
+            'time': data['time']?.toString() ?? '',
+            'room': data['room']?.toString() ?? '',
+            'subject': data['subject']?.toString() ?? '',
+          };
+        }).toList();
+
         setState(() {
-          timetableResult = [];
+          timetableResult = results;
         });
       }
     } catch (e) {
-      print("Error loading timetable: $e");
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error loading data: $e'),
+          content: Text('Error loading timetable: $e'),
           backgroundColor: Colors.redAccent,
         ),
       );
@@ -220,6 +111,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void resetTimetableFields() {
     setState(() {
       selectedTeacher = null;
+      selectedTeacherName = null;
       selectedTimetableDay = null;
       selectedTime = null;
       timetableResult.clear();
@@ -246,8 +138,9 @@ class _HomeScreenState extends State<HomeScreen> {
     String label,
     String? value,
     List<String> items,
-    ValueChanged<String?> onChanged,
-  ) {
+    ValueChanged<String?> onChanged, {
+    Map<String, String>? displayMap,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -291,7 +184,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 12),
                     child: Text(
-                      item,
+                      displayMap != null ? (displayMap[item] ?? item) : item,
                       style: TextStyle(
                         color: isDarkMode ? Colors.white : Colors.indigo[900],
                         fontWeight: FontWeight.w500,
@@ -672,49 +565,113 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                               const SizedBox(height: 24),
 
-                              // Loading indicator for teachers
-                              if (isLoading && teachers.isEmpty)
-                                const Center(
-                                  child: CircularProgressIndicator(),
-                                ),
-
                               // Teacher Dropdown
-                              _buildDropdown(
-                                'Teacher',
-                                selectedTeacher,
-                                teachers,
-                                (value) {
-                                  setState(() {
-                                    selectedTeacher = value;
-                                  });
+                              StreamBuilder<QuerySnapshot>(
+                                stream: _teachersStream,
+                                builder: (context, snapshot) {
+                                  if (snapshot.hasError) {
+                                    return const Text('Error loading teachers');
+                                  }
+
+                                  if (snapshot.connectionState ==
+                                      ConnectionState.waiting) {
+                                    return const Center(
+                                      child: CircularProgressIndicator(),
+                                    );
+                                  }
+
+                                  final teacherDocs = snapshot.data!.docs;
+
+                                  final teacherMap = {
+                                    for (var doc in teacherDocs)
+                                      doc.id: doc['name'] as String,
+                                  };
+
+                                  return _buildDropdown(
+                                    'Teacher',
+                                    selectedTeacher,
+                                    teacherMap.keys.toList(),
+                                    (value) {
+                                      setState(() {
+                                        selectedTeacher = value;
+                                        selectedTeacherName = teacherMap[value];
+                                      });
+                                    },
+                                    displayMap:
+                                        teacherMap, // ✅ YAHAN HONA CHAHIYE
+                                  );
                                 },
                               ),
 
                               const SizedBox(height: 20),
 
                               // Day Dropdown
-                              _buildDropdown(
-                                'Day',
-                                selectedTimetableDay,
-                                days,
-                                (value) {
-                                  setState(() {
-                                    selectedTimetableDay = value;
-                                  });
+                              StreamBuilder<QuerySnapshot>(
+                                stream: _timetableStream,
+                                builder: (context, snapshot) {
+                                  if (!snapshot.hasData) {
+                                    return const SizedBox.shrink();
+                                  }
+
+                                  final docs = snapshot.data!.docs;
+                                  final daySet = <String>{};
+
+                                  for (var doc in docs) {
+                                    final day = doc['day'];
+                                    if (day != null &&
+                                        day.toString().isNotEmpty) {
+                                      daySet.add(day.toString());
+                                    }
+                                  }
+
+                                  final dynamicDays = daySet.toList()..sort();
+
+                                  return _buildDropdown(
+                                    'Day',
+                                    selectedTimetableDay,
+                                    dynamicDays,
+                                    (value) {
+                                      setState(() {
+                                        selectedTimetableDay = value;
+                                      });
+                                    },
+                                  );
                                 },
                               ),
 
                               const SizedBox(height: 20),
 
                               // Time Dropdown (Optional)
-                              _buildDropdown(
-                                'Time Slot (Optional)',
-                                selectedTime,
-                                times,
-                                (value) {
-                                  setState(() {
-                                    selectedTime = value;
-                                  });
+                              StreamBuilder<QuerySnapshot>(
+                                stream: _timetableStream,
+                                builder: (context, snapshot) {
+                                  if (!snapshot.hasData) {
+                                    return const SizedBox.shrink();
+                                  }
+
+                                  final docs = snapshot.data!.docs;
+
+                                  final timeSet = <String>{};
+                                  for (var doc in docs) {
+                                    final time = doc['time'];
+                                    if (time != null &&
+                                        time.toString().isNotEmpty) {
+                                      timeSet.add(time.toString());
+                                    }
+                                  }
+
+                                  final dynamicTimes = timeSet.toList()..sort();
+
+                                  return _buildDropdown(
+                                    'Time Slot (Optional)',
+                                    selectedTime,
+                                    dynamicTimes,
+                                    (value) {
+                                      setState(() {
+                                        selectedTime = value;
+                                      });
+                                    },
+                                  );
                                 },
                               ),
 
@@ -870,7 +827,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                           const SizedBox(width: 8),
                                           Expanded(
                                             child: Text(
-                                              'Timetable for $selectedTeacher',
+                                              'Timetable for $selectedTeacherName',
                                               style: TextStyle(
                                                 fontSize: 18,
                                                 fontWeight: FontWeight.bold,

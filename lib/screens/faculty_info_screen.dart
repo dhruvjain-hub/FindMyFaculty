@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../models/teacher_model.dart';
 
 class FacultyInfoScreen extends StatefulWidget {
   final bool isDarkMode;
@@ -10,79 +12,41 @@ class FacultyInfoScreen extends StatefulWidget {
 }
 
 class _FacultyInfoScreenState extends State<FacultyInfoScreen> {
-  // Sample faculty data
-  final List<Map<String, dynamic>> facultyList = [
-    {
-      'name': 'Dr. Rajesh Sharma',
-      'department': 'Computer Science',
-      'email': 'rajesh.sharma@university.edu',
-      'phone': '+91 9876543210',
-      'office': 'Block A, Room 101',
-      'subjects': ['Data Structures', 'Algorithms', 'Machine Learning'],
-      'qualification': 'Ph.D. in Computer Science',
-      'experience': '15 years',
-      'image': '👨‍🏫',
-    },
-    {
-      'name': 'Prof. Priya Gupta',
-      'department': 'Mathematics',
-      'email': 'priya.gupta@university.edu',
-      'phone': '+91 9876543211',
-      'office': 'Block B, Room 205',
-      'subjects': ['Calculus', 'Linear Algebra', 'Statistics'],
-      'qualification': 'M.Sc., Ph.D. in Mathematics',
-      'experience': '12 years',
-      'image': '👩‍🏫',
-    },
-    {
-      'name': 'Dr. Amit Kumar',
-      'department': 'Physics',
-      'email': 'amit.kumar@university.edu',
-      'phone': '+91 9876543212',
-      'office': 'Block C, Room 150',
-      'subjects': ['Quantum Mechanics', 'Thermodynamics', 'Optics'],
-      'qualification': 'Ph.D. in Physics',
-      'experience': '18 years',
-      'image': '👨‍🔬',
-    },
-    {
-      'name': 'Prof. Sunita Patel',
-      'department': 'Chemistry',
-      'email': 'sunita.patel@university.edu',
-      'phone': '+91 9876543213',
-      'office': 'Block D, Room 320',
-      'subjects': ['Organic Chemistry', 'Analytical Chemistry', 'Biochemistry'],
-      'qualification': 'Ph.D. in Chemistry',
-      'experience': '14 years',
-      'image': '👩‍🔬',
-    },
-    {
-      'name': 'Dr. Vikram Singh',
-      'department': 'Electronics',
-      'email': 'vikram.singh@university.edu',
-      'phone': '+91 9876543214',
-      'office': 'Block E, Room 415',
-      'subjects': ['Digital Electronics', 'Microprocessors', 'VLSI Design'],
-      'qualification': 'Ph.D. in Electronics',
-      'experience': '16 years',
-      'image': '👨‍💻',
-    },
-  ];
+  final Stream<QuerySnapshot> _teachersStream = FirebaseFirestore.instance
+      .collection('teachers')
+      .where('isActive', isEqualTo: true)
+      .snapshots();
 
   String searchQuery = '';
   String selectedDepartment = 'All';
-  List<String> departments = ['All', 'Computer Science', 'Mathematics', 'Physics', 'Chemistry', 'Electronics'];
+  List<String> departments = ['All'];
 
-  List<Map<String, dynamic>> get filteredFaculty {
-    return facultyList.where((faculty) {
-      final matchesSearch = faculty['name'].toLowerCase().contains(searchQuery.toLowerCase()) ||
-          faculty['department'].toLowerCase().contains(searchQuery.toLowerCase());
-      final matchesDepartment = selectedDepartment == 'All' || faculty['department'] == selectedDepartment;
+  List<String> _extractDepartments(List<TeacherModel> teachers) {
+    final deptSet = <String>{};
+
+    for (var t in teachers) {
+      if (t.department.isNotEmpty) {
+        deptSet.add(t.department);
+      }
+    }
+
+    return ['All', ...deptSet.toList()..sort()];
+  }
+
+  List<TeacherModel> _filterTeachers(List<TeacherModel> teachers) {
+    return teachers.where((t) {
+      final matchesSearch =
+          t.name.toLowerCase().contains(searchQuery.toLowerCase()) ||
+          t.department.toLowerCase().contains(searchQuery.toLowerCase());
+
+      final matchesDepartment =
+          selectedDepartment == 'All' || t.department == selectedDepartment;
+
       return matchesSearch && matchesDepartment;
     }).toList();
   }
 
-  void _showFacultyDetails(Map<String, dynamic> faculty) {
+  void _showFacultyDetails(TeacherModel faculty) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -90,7 +54,7 @@ class _FacultyInfoScreenState extends State<FacultyInfoScreen> {
       builder: (context) => Container(
         height: MediaQuery.of(context).size.height * 0.85,
         decoration: BoxDecoration(
-          color: widget.isDarkMode ? Colors.indigo[900] : Colors.white,
+          color: widget.isDarkMode ? Colors.indigo[900]! : Colors.white,
           borderRadius: const BorderRadius.only(
             topLeft: Radius.circular(25),
             topRight: Radius.circular(25),
@@ -110,40 +74,52 @@ class _FacultyInfoScreenState extends State<FacultyInfoScreen> {
                         width: 80,
                         height: 80,
                         decoration: BoxDecoration(
-                          color: widget.isDarkMode ? Colors.indigo[700] : Colors.indigo[100],
+                          color: widget.isDarkMode
+                              ? Colors.indigo[700]!
+                              : Colors.indigo[100]!,
                           shape: BoxShape.circle,
                           border: Border.all(
-                            color: widget.isDarkMode ? Colors.amber : Colors.indigo,
+                            color: widget.isDarkMode
+                                ? Colors.amber
+                                : Colors.indigo,
                             width: 3,
                           ),
                         ),
                         child: Center(
                           child: Text(
-                            faculty['image'],
+                            faculty.image,
                             style: const TextStyle(fontSize: 35),
                           ),
                         ),
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        faculty['name'],
+                        faculty.name,
                         style: TextStyle(
                           fontSize: 24,
                           fontWeight: FontWeight.bold,
-                          color: widget.isDarkMode ? Colors.white : Colors.indigo[900],
+                          color: widget.isDarkMode
+                              ? Colors.white
+                              : Colors.indigo[900],
                         ),
                       ),
                       const SizedBox(height: 8),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 6,
+                        ),
                         decoration: BoxDecoration(
-                          color: widget.isDarkMode ? Colors.indigo[700] : Colors.indigo[50],
+                          color: widget.isDarkMode
+                              ? Colors.indigo[700]!
+                              : Colors.indigo[50]!,
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
-                          faculty['department'],
+                          faculty.department,
                           style: TextStyle(
-                            color: widget.isDarkMode ? Colors.amber : Colors.indigo,
+                            color:
+                                widget.isDarkMode ? Colors.amber : Colors.indigo,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -161,17 +137,17 @@ class _FacultyInfoScreenState extends State<FacultyInfoScreen> {
                     _buildInfoItem(
                       icon: Icons.email,
                       label: 'Email',
-                      value: faculty['email'],
+                      value: faculty.email,
                     ),
                     _buildInfoItem(
                       icon: Icons.phone,
                       label: 'Phone',
-                      value: faculty['phone'],
+                      value: faculty.phone,
                     ),
                     _buildInfoItem(
                       icon: Icons.location_on,
                       label: 'Office',
-                      value: faculty['office'],
+                      value: faculty.office,
                     ),
                   ],
                 ),
@@ -186,12 +162,12 @@ class _FacultyInfoScreenState extends State<FacultyInfoScreen> {
                     _buildInfoItem(
                       icon: Icons.workspace_premium,
                       label: 'Qualification',
-                      value: faculty['qualification'],
+                      value: faculty.qualification,
                     ),
                     _buildInfoItem(
                       icon: Icons.work_history,
                       label: 'Experience',
-                      value: faculty['experience'],
+                      value: faculty.experience,
                     ),
                   ],
                 ),
@@ -206,20 +182,29 @@ class _FacultyInfoScreenState extends State<FacultyInfoScreen> {
                     Wrap(
                       spacing: 8,
                       runSpacing: 8,
-                      children: faculty['subjects'].map<Widget>((subject) {
+                      children: faculty.subjects.map<Widget>((subject) {
                         return Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
                           decoration: BoxDecoration(
-                            color: widget.isDarkMode ? Colors.indigo[800] : Colors.indigo[50],
+                            color: widget.isDarkMode
+                                ? Colors.indigo[800]!
+                                : Colors.indigo[50]!,
                             borderRadius: BorderRadius.circular(15),
                             border: Border.all(
-                              color: widget.isDarkMode ? Colors.indigo[600]! : Colors.indigo[200]!,
+                              color: widget.isDarkMode
+                                  ? Colors.indigo[600]!
+                                  : Colors.indigo[200]!,
                             ),
                           ),
                           child: Text(
                             subject,
                             style: TextStyle(
-                              color: widget.isDarkMode ? Colors.white70 : Colors.indigo[700],
+                              color: widget.isDarkMode
+                                  ? Colors.white70
+                                  : Colors.indigo[700],
                               fontSize: 12,
                               fontWeight: FontWeight.w500,
                             ),
@@ -246,17 +231,21 @@ class _FacultyInfoScreenState extends State<FacultyInfoScreen> {
                             borderRadius: BorderRadius.circular(12),
                           ),
                           side: BorderSide(
-                            color: widget.isDarkMode ? Colors.indigo[600]! : Colors.indigo,
+                            color: widget.isDarkMode
+                                ? Colors.indigo[600]!
+                                : Colors.indigo,
                           ),
                         ),
                         icon: Icon(
                           Icons.email,
-                          color: widget.isDarkMode ? Colors.white : Colors.indigo,
+                          color:
+                              widget.isDarkMode ? Colors.white : Colors.indigo,
                         ),
                         label: Text(
                           'Email',
                           style: TextStyle(
-                            color: widget.isDarkMode ? Colors.white : Colors.indigo,
+                            color:
+                                widget.isDarkMode ? Colors.white : Colors.indigo,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -279,9 +268,7 @@ class _FacultyInfoScreenState extends State<FacultyInfoScreen> {
                         icon: const Icon(Icons.phone, size: 20),
                         label: const Text(
                           'Call',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w600,
-                          ),
+                          style: TextStyle(fontWeight: FontWeight.w600),
                         ),
                       ),
                     ),
@@ -325,7 +312,8 @@ class _FacultyInfoScreenState extends State<FacultyInfoScreen> {
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: widget.isDarkMode ? Colors.indigo[800] : Colors.indigo[50],
+            color:
+                widget.isDarkMode ? Colors.indigo[800]! : Colors.indigo[50]!,
             borderRadius: BorderRadius.circular(12),
           ),
           child: Column(
@@ -361,7 +349,9 @@ class _FacultyInfoScreenState extends State<FacultyInfoScreen> {
                   label,
                   style: TextStyle(
                     fontSize: 12,
-                    color: widget.isDarkMode ? Colors.white70 : Colors.indigo[600],
+                    color: widget.isDarkMode
+                        ? Colors.white70
+                        : Colors.indigo[600],
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -370,7 +360,8 @@ class _FacultyInfoScreenState extends State<FacultyInfoScreen> {
                   value,
                   style: TextStyle(
                     fontSize: 14,
-                    color: widget.isDarkMode ? Colors.white : Colors.indigo[900],
+                    color:
+                        widget.isDarkMode ? Colors.white : Colors.indigo[900],
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -385,15 +376,13 @@ class _FacultyInfoScreenState extends State<FacultyInfoScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: widget.isDarkMode ? Colors.indigo[900] : Colors.white,
+      backgroundColor:
+          widget.isDarkMode ? Colors.indigo[900]! : Colors.white,
       appBar: AppBar(
-        backgroundColor: widget.isDarkMode ? Colors.indigo[800] : Colors.indigo,
+        backgroundColor: widget.isDarkMode ? Colors.indigo[800]! : Colors.indigo,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back,
-            color: Colors.white,
-          ),
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () {
             Navigator.pop(context);
           },
@@ -427,11 +416,15 @@ class _FacultyInfoScreenState extends State<FacultyInfoScreen> {
                   // Search Bar
                   Container(
                     decoration: BoxDecoration(
-                      color: widget.isDarkMode ? Colors.indigo[800] : Colors.white,
+                      color: widget.isDarkMode
+                          ? Colors.indigo[800]!
+                          : Colors.white,
                       borderRadius: BorderRadius.circular(15),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(widget.isDarkMode ? 0.3 : 0.1),
+                          color: Colors.black.withOpacity(
+                            widget.isDarkMode ? 0.3 : 0.1,
+                          ),
                           blurRadius: 8,
                           offset: const Offset(0, 2),
                         ),
@@ -446,40 +439,80 @@ class _FacultyInfoScreenState extends State<FacultyInfoScreen> {
                       decoration: InputDecoration(
                         hintText: 'Search faculty by name or department...',
                         hintStyle: TextStyle(
-                          color: widget.isDarkMode ? Colors.white60 : Colors.indigo[400],
+                          color: widget.isDarkMode
+                              ? Colors.white60
+                              : Colors.indigo[400],
                         ),
                         prefixIcon: Icon(
                           Icons.search,
-                          color: widget.isDarkMode ? Colors.amber : Colors.indigo,
+                          color:
+                              widget.isDarkMode ? Colors.amber : Colors.indigo,
                         ),
                         border: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 16,
+                        ),
                       ),
                       style: TextStyle(
-                        color: widget.isDarkMode ? Colors.white : Colors.indigo[900],
+                        color:
+                            widget.isDarkMode ? Colors.white : Colors.indigo[900],
                       ),
                     ),
                   ),
                   const SizedBox(height: 12),
+                ],
+              ),
+            ),
 
-                  // Department Filter
-                  SizedBox(
+            // Department Filter (now outside StreamBuilder)
+            StreamBuilder<QuerySnapshot>(
+              stream: _teachersStream,
+              builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return const SizedBox.shrink();
+                }
+
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const SizedBox(
                     height: 50,
+                    child: Center(child: CircularProgressIndicator()),
+                  );
+                }
+
+                final teachers = snapshot.data!.docs
+                    .map((doc) => TeacherModel.fromFirestore(doc))
+                    .toList();
+
+                final dynamicDepartments = _extractDepartments(teachers);
+
+                return SizedBox(
+                  height: 50,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: ListView.builder(
                       scrollDirection: Axis.horizontal,
-                      itemCount: departments.length,
+                      itemCount: dynamicDepartments.length,
                       itemBuilder: (context, index) {
-                        final department = departments[index];
+                        final department = dynamicDepartments[index];
                         final isSelected = department == selectedDepartment;
+
                         return Padding(
-                          padding: const EdgeInsets.only(right: 8),
+                          padding: EdgeInsets.only(
+                              right: index == dynamicDepartments.length - 1
+                                  ? 0
+                                  : 8),
                           child: FilterChip(
                             label: Text(
                               department,
                               style: TextStyle(
                                 color: isSelected
-                                    ? (widget.isDarkMode ? Colors.indigo[900] : Colors.white)
-                                    : (widget.isDarkMode ? Colors.white : Colors.indigo),
+                                    ? (widget.isDarkMode
+                                        ? Colors.indigo[900]
+                                        : Colors.white)
+                                    : (widget.isDarkMode
+                                        ? Colors.white
+                                        : Colors.indigo),
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
@@ -489,144 +522,192 @@ class _FacultyInfoScreenState extends State<FacultyInfoScreen> {
                                 selectedDepartment = department;
                               });
                             },
-                            backgroundColor: widget.isDarkMode ? Colors.indigo[800] : Colors.indigo[50],
-                            selectedColor: widget.isDarkMode ? Colors.amber : Colors.indigo,
-                            checkmarkColor: widget.isDarkMode ? Colors.indigo[900] : Colors.white,
+                            backgroundColor: widget.isDarkMode
+                                ? Colors.indigo[800]!
+                                : Colors.indigo[50]!,
+                            selectedColor:
+                                widget.isDarkMode ? Colors.amber : Colors.indigo,
+                            checkmarkColor: widget.isDarkMode
+                                ? Colors.indigo[900]
+                                : Colors.white,
                           ),
                         );
                       },
                     ),
                   ),
-                ],
-              ),
+                );
+              },
             ),
 
+            const SizedBox(height: 8),
+
             // Faculty Count
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                children: [
-                  Text(
-                    '${filteredFaculty.length} Faculty Members',
-                    style: TextStyle(
-                      color: widget.isDarkMode ? Colors.white70 : Colors.indigo[600],
-                      fontWeight: FontWeight.w600,
+            StreamBuilder<QuerySnapshot>(
+              stream: _teachersStream,
+              builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return const SizedBox.shrink();
+                }
+
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const SizedBox(
+                    height: 30,
+                    child: Center(child: CircularProgressIndicator()),
+                  );
+                }
+
+                final teachers = snapshot.data!.docs
+                    .map((doc) => TeacherModel.fromFirestore(doc))
+                    .toList();
+
+                final filteredFaculty = _filterTeachers(teachers);
+
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      '${filteredFaculty.length} faculty member${filteredFaculty.length != 1 ? 's' : ''} found',
+                      style: TextStyle(
+                        color: widget.isDarkMode
+                            ? Colors.white70
+                            : Colors.indigo[600],
+                        fontWeight: FontWeight.w500,
+                        fontSize: 14,
+                      ),
                     ),
                   ),
-                ],
-              ),
+                );
+              },
             ),
+
             const SizedBox(height: 8),
 
             // Faculty List
             Expanded(
-              child: filteredFaculty.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.people_outline,
-                            size: 64,
-                            color: widget.isDarkMode ? Colors.indigo[300] : Colors.indigo[200],
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'No faculty found',
-                            style: TextStyle(
-                              fontSize: 18,
-                              color: widget.isDarkMode ? Colors.white70 : Colors.indigo[600],
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Try changing your search or filter',
-                            style: TextStyle(
-                              color: widget.isDarkMode ? Colors.white54 : Colors.indigo[400],
-                            ),
-                          ),
-                        ],
+              child: StreamBuilder<QuerySnapshot>(
+                stream: _teachersStream,
+                builder: (context, snapshot) {
+                  if (snapshot.hasError) {
+                    return Center(
+                      child: Text(
+                        'Something went wrong',
+                        style: TextStyle(
+                          color: widget.isDarkMode
+                              ? Colors.white
+                              : Colors.indigo[900],
+                        ),
                       ),
-                    )
-                  : ListView.builder(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      itemCount: filteredFaculty.length,
-                      itemBuilder: (context, index) {
-                        final faculty = filteredFaculty[index];
-                        return Card(
-                          elevation: 4,
-                          margin: const EdgeInsets.only(bottom: 12),
-                          color: widget.isDarkMode ? Colors.indigo[800] : Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(15),
-                          ),
-                          child: ListTile(
-                            contentPadding: const EdgeInsets.all(16),
-                            leading: Container(
-                              width: 60,
-                              height: 60,
-                              decoration: BoxDecoration(
-                                color: widget.isDarkMode ? Colors.indigo[700] : Colors.indigo[100],
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: widget.isDarkMode ? Colors.amber : Colors.indigo,
-                                  width: 2,
-                                ),
-                              ),
-                              child: Center(
-                                child: Text(
-                                  faculty['image'],
-                                  style: const TextStyle(fontSize: 24),
-                                ),
-                              ),
-                            ),
-                            title: Text(
-                              faculty['name'],
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                                color: widget.isDarkMode ? Colors.white : Colors.indigo[900],
-                              ),
-                            ),
-                            subtitle: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const SizedBox(height: 4),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: widget.isDarkMode ? Colors.indigo[700] : Colors.indigo[50],
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  child: Text(
-                                    faculty['department'],
-                                    style: TextStyle(
-                                      color: widget.isDarkMode ? Colors.amber : Colors.indigo,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  faculty['qualification'],
-                                  style: TextStyle(
-                                    color: widget.isDarkMode ? Colors.white70 : Colors.indigo[600],
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            trailing: Icon(
-                              Icons.arrow_forward_ios,
-                              color: widget.isDarkMode ? Colors.amber : Colors.indigo,
-                              size: 16,
-                            ),
-                            onTap: () => _showFacultyDetails(faculty),
-                          ),
-                        );
-                      },
+                    );
+                  }
+
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+
+                  final teachers = snapshot.data!.docs
+                      .map((doc) => TeacherModel.fromFirestore(doc))
+                      .toList();
+
+                  final filteredFaculty = _filterTeachers(teachers);
+
+                  if (filteredFaculty.isEmpty) {
+                    return Center(
+                      child: Text(
+                        'No faculty found',
+                        style: TextStyle(
+                          color: widget.isDarkMode
+                              ? Colors.white70
+                              : Colors.indigo[600],
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    );
+                  }
+
+                  return ListView.builder(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
                     ),
+                    itemCount: filteredFaculty.length,
+                    itemBuilder: (context, index) {
+                      final faculty = filteredFaculty[index];
+
+                      return Card(
+                        elevation: 4,
+                        margin: const EdgeInsets.only(bottom: 12),
+                        color: widget.isDarkMode
+                            ? Colors.indigo[800]!
+                            : Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: ListTile(
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
+                          ),
+                          leading: Container(
+                            width: 50,
+                            height: 50,
+                            decoration: BoxDecoration(
+                              color: widget.isDarkMode
+                                  ? Colors.indigo[700]!
+                                  : Colors.indigo[100]!,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: widget.isDarkMode
+                                    ? Colors.amber
+                                    : Colors.indigo,
+                                width: 2,
+                              ),
+                            ),
+                            child: Center(
+                              child: Text(
+                                faculty.image,
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  color: widget.isDarkMode
+                                      ? Colors.white
+                                      : Colors.indigo,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                          title: Text(
+                            faculty.name,
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: widget.isDarkMode
+                                  ? Colors.white
+                                  : Colors.indigo[900],
+                              fontSize: 16,
+                            ),
+                          ),
+                          subtitle: Text(
+                            faculty.department,
+                            style: TextStyle(
+                              color: widget.isDarkMode
+                                  ? Colors.white70
+                                  : Colors.indigo[600],
+                            ),
+                          ),
+                          trailing: Icon(
+                            Icons.chevron_right,
+                            color: widget.isDarkMode
+                                ? Colors.amber
+                                : Colors.indigo,
+                          ),
+                          onTap: () => _showFacultyDetails(faculty),
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
             ),
           ],
         ),
